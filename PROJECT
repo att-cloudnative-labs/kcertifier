@@ -1,0 +1,3 @@
+version: "2"
+domain: kube-kcertifier.atteg.com
+repo: github.com/att-cloudnative-labs/kcertifier
