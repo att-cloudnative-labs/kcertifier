@@ -1,0 +1,148 @@
+
+---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.2.4
+  creationTimestamp: null
+  name: kcertifiers.kcertifier.atteg.com
+spec:
+  additionalPrinterColumns:
+  - JSONPath: .spec.subject.commonName
+    name: Common-Name
+    type: string
+  - JSONPath: .status.kcertifierSpecHash
+    name: Spec-Hash
+    type: string
+  - JSONPath: .status.currentPackageHash
+    name: Pkg-Hash
+    type: string
+  - JSONPath: .status.keySecretName
+    name: KeySecret
+    type: string
+  - JSONPath: .status.csrName
+    name: CSRName
+    type: string
+  - JSONPath: .status.csrStatus
+    name: CSRStatus
+    type: string
+  group: kcertifier.atteg.com
+  names:
+    kind: Kcertifier
+    listKind: KcertifierList
+    plural: kcertifiers
+    singular: kcertifier
+  scope: Namespaced
+  subresources:
+    status: {}
+  validation:
+    openAPIV3Schema:
+      description: Kcertifier is the Schema for the kcertifiers API
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          description: KcertifierSpec defines the desired state of Kcertifier
+          properties:
+            keyLength:
+              description: 'Important: Run "make" to regenerate code after modifying
+                this file'
+              type: integer
+            packages:
+              items:
+                properties:
+                  annotations:
+                    additionalProperties:
+                      type: string
+                    type: object
+                  imports:
+                    items:
+                      properties:
+                        namespace:
+                          type: string
+                        secretName:
+                          type: string
+                        sourceKey:
+                          type: string
+                        targetKey:
+                          type: string
+                      required:
+                      - targetKey
+                      type: object
+                    type: array
+                  labels:
+                    additionalProperties:
+                      type: string
+                    type: object
+                  options:
+                    additionalProperties:
+                      type: string
+                    type: object
+                  secretName:
+                    type: string
+                  type:
+                    type: string
+                type: object
+              type: array
+            sans:
+              items:
+                type: string
+              type: array
+            subject:
+              properties:
+                commonName:
+                  type: string
+                country:
+                  type: string
+                locality:
+                  type: string
+                organization:
+                  type: string
+                organizationalUnit:
+                  type: string
+                stateOrProvince:
+                  type: string
+              type: object
+          type: object
+        status:
+          description: KcertifierStatus defines the observed state of Kcertifier
+          properties:
+            csrName:
+              type: string
+            csrStatus:
+              type: string
+            currentPackageHash:
+              type: string
+            kcertifierSpecHash:
+              description: 'Important: Run "make" to regenerate code after modifying
+                this fileKcertifierSpecHash string            `json:"kcertifierSpecHash"`'
+              type: string
+            keySecretName:
+              type: string
+          required:
+          - currentPackageHash
+          - kcertifierSpecHash
+          type: object
+      type: object
+  version: v1alpha1
+  versions:
+  - name: v1alpha1
+    served: true
+    storage: true
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []

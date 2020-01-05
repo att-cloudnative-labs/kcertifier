@@ -3,7 +3,7 @@ kind: Namespace
 metadata:
   labels:
     control-plane: controller-manager
-  name: system
+  name: kcertifier-system
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -31,9 +31,9 @@ spec:
         name: manager
         resources:
           limits:
-            cpu: 100m
-            memory: 30Mi
+            cpu: 400m
+            memory: 2Gi
           requests:
-            cpu: 100m
-            memory: 20Mi
+            cpu: 400m
+            memory: 2Gi
       terminationGracePeriodSeconds: 10

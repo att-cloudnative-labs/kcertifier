@@ -1,12 +1,12 @@
 # Adds namespace to all resources.
-namespace: kcertifier-manager-system
+namespace: kcertifier-system
 
 # Value of this field is prepended to the
 # names of all resources, e.g. a deployment named
 # "wordpress" becomes "alices-wordpress".
 # Note that it should also match with the prefix (text before '-') of the namespace
 # field above.
-namePrefix: kcertifier-manager-
+namePrefix: kcertifier-
 
 # Labels to add to all resources and selectors.
 #commonLabels:
@@ -20,6 +20,8 @@ bases:
 #- ../webhook
 # [CERTMANAGER] To enable cert-manager, uncomment all sections with 'CERTMANAGER'. 'WEBHOOK' components are required.
 #- ../certmanager
+# [PROMETHEUS] To enable prometheus monitor, uncomment all sections with 'PROMETHEUS'. 
+#- ../prometheus
 
 patchesStrategicMerge:
   # Protect the /metrics endpoint by putting it behind auth.
@@ -47,16 +49,16 @@ vars:
 #- name: CERTIFICATE_NAMESPACE # namespace of the certificate CR
 #  objref:
 #    kind: Certificate
-#    group: certmanager.k8s.io
-#    version: v1alpha1
+#    group: cert-manager.io
+#    version: v1alpha2
 #    name: serving-cert # this name should match the one in certificate.yaml
 #  fieldref:
 #    fieldpath: metadata.namespace
 #- name: CERTIFICATE_NAME
 #  objref:
 #    kind: Certificate
-#    group: certmanager.k8s.io
-#    version: v1alpha1
+#    group: cert-manager.io
+#    version: v1alpha2
 #    name: serving-cert # this name should match the one in certificate.yaml
 #- name: SERVICE_NAMESPACE # namespace of the service
 #  objref:

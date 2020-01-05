@@ -18,35 +18,76 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"github.com/go-logr/logr"
-	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
-	v1 "k8s.io/api/core/v1"
+	kcertifierv1alpha1 "github.com/att-cloudnative-labs/kcertifier/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
+	certsv1beta1 "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/record"
+
+	"github.com/go-logr/logr"
+	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
+)
+
+const (
+	KcertifierNotFoundForCSREvent = "KcertifierNotFoundForCSR"
 )
 
 // CertificateSigningRequestReconciler reconciles a CertificateSigningRequest object
 type CertificateSigningRequestReconciler struct {
 	client.Client
-	Log        logr.Logger
-	CertClient v1beta1.CertificatesV1beta1Interface
+	Log      logr.Logger
+	Scheme   *runtime.Scheme
+	Recorder record.EventRecorder
+
+	ApprovalClient certsv1beta1.CertificatesV1beta1Interface
 }
 
-type CSRState struct {
-	Approved bool
-	CertificateReady bool
-	CertificateSecretUpdated bool
-	OutputsUpdated bool
-}
+// +kubebuilder:rbac:groups=certificates.k8s.io,resources=certificatesigningrequests,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=certificates.k8s.io,resources=certificatesigningrequests/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=certificates.k8s.io,resources=certificatesigningrequests/approval,verbs=create;update
+// +kubebuilder:rbac:groups=kcertifier.atteg.com,resources=kcertifiers,verbs=get;list;watch
+// +kubebuilder:rbac:groups=kcertifier.atteg.com,resources=kcertifiers/status,verbs=get;update;patch
 
-type OutputFormat struct {
-	Name string
-	Type string
-	Key string
-	Opts string
+func (r *CertificateSigningRequestReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
+	ctx := context.Background()
+
+	var csr certificatesv1beta1.CertificateSigningRequest
+	if err := r.Get(ctx, req.NamespacedName, &csr); err != nil {
+		// If deletes need to be handled, check for ErrorNotFound here
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
+	key, ok := csr.Annotations[KcertifierNamespaceNameAnnotation]
+	if !ok {
+		return ctrl.Result{}, nil
+	}
+	namespace, name, err := cache.SplitMetaNamespaceKey(key)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("error error splitting meta namespace key: %s", err.Error())
+	}
+
+	if csr.Status.Conditions == nil ||
+		len(csr.Status.Conditions) == 0 ||
+		csr.Status.Conditions[0].Type != certificatesv1beta1.CertificateApproved {
+
+		if err := r.approveCsr(ctx, &csr, namespace, name); err != nil {
+			return ctrl.Result{}, fmt.Errorf("error approving csr: %s", err.Error())
+		}
+		return ctrl.Result{}, nil
+	}
+
+	if csr.Status.Certificate != nil && len(csr.Status.Certificate) > 0 {
+		if err := r.setSignedInKcertifierStatus(ctx, namespace, name); err != nil {
+			return ctrl.Result{}, fmt.Errorf("error setting signed status in kcertifier status: %s", err.Error())
+		}
+	}
+
+	return ctrl.Result{}, nil
 }
 
 func (r *CertificateSigningRequestReconciler) SetupWithManager(mgr ctrl.Manager) error {
@@ -55,114 +96,52 @@ func (r *CertificateSigningRequestReconciler) SetupWithManager(mgr ctrl.Manager)
 		Complete(r)
 }
 
-// +kubebuilder:rbac:groups=certificates.k8s.io,resources=certificatesigningrequests,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=certificates.k8s.io,resources=certificatesigningrequests/status,verbs=get;update;patch
-
-func (r *CertificateSigningRequestReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
-	ctx := context.Background()
-
-	r.Log.V(1).Info("reconciling csr", "name", req.Name)
-
-	var csr certificatesv1beta1.CertificateSigningRequest
-	if err := r.Get(ctx, req.NamespacedName, &csr); err != nil {
-		return ctrl.Result{}, client.IgnoreNotFound(err)
-	}
-	if len(csr.Annotations[CSRAnnotation]) == 0 {
-		return ctrl.Result{}, nil
-	}
-
-	state := CSRState{}
-
-	// this is effectively a state machine; each state must be distinct and appropriate action will be taken
-	if err := r.getCSRState(ctx, csr, &state); err != nil {
-		return ctrl.Result{}, err
-	}
-
-	if !state.Approved {
-		return ctrl.Result{}, r.approveCSR(ctx, csr)
-	}
-
-	if !state.CertificateSecretUpdated && state.CertificateReady {
-		return ctrl.Result{}, r.retrieveCertificate(ctx, csr)
-	}
-
-	return ctrl.Result{}, nil
-}
-
-func (r *CertificateSigningRequestReconciler) getCSRState(ctx context.Context, csr certificatesv1beta1.CertificateSigningRequest, state *CSRState) error {
-	if csr.Status.Conditions != nil && csr.Status.Conditions[0].Type == "Approved" {
-		state.Approved = true
-	}
-	if csr.Status.Certificate != nil {
-		state.CertificateReady = true
-	}
-	return r.getCertificateSecretState(ctx, csr, state)
-}
-
-func (r *CertificateSigningRequestReconciler) getCertificateSecretState(ctx context.Context, csr certificatesv1beta1.CertificateSigningRequest, state *CSRState) error {
-	namespace := csr.Annotations[CSRAnnotation]
-
-	var certSecret v1.Secret
-	if err := r.Get(ctx, types.NamespacedName{Namespace: namespace, Name: CertKeySecretName}, &certSecret); err != nil {
+func (r *CertificateSigningRequestReconciler) setSignedInKcertifierStatus(ctx context.Context, namespace, name string) error {
+	r.Log.WithValues("kcName", name).Info("setting signed status in kcertifier")
+	namespacedName := types.NamespacedName{Namespace: namespace, Name: name}
+	var kc kcertifierv1alpha1.Kcertifier
+	if err := r.Get(ctx, namespacedName, &kc); err != nil {
 		if errors.IsNotFound(err) {
+			r.Log.Info("could not set signed status in kcertifier. not found")
 			return nil
-		} else {
-			return err
 		}
+		return fmt.Errorf("error getting kcertifier: %s", err.Error())
 	}
-	if len(certSecret.Data[CertKeySecretCertDataKey]) == 0 {
-		return nil
+	kcCopy := kc.DeepCopy()
+	kcCopy.Status.CsrStatus = "Signed"
+	if err := r.Status().Update(ctx, kcCopy); err != nil {
+		return fmt.Errorf("error updating status of kcertifier: %s", err.Error())
 	}
-	// TODO check that certificate is actually up-to-date
-	state.CertificateSecretUpdated = true
 	return nil
 }
 
-func (r *CertificateSigningRequestReconciler) approveCSR(ctx context.Context, csr certificatesv1beta1.CertificateSigningRequest) error {
-	csrCopy := csr.DeepCopy()
+func (r *CertificateSigningRequestReconciler) approveCsr(ctx context.Context, csr *certificatesv1beta1.CertificateSigningRequest, namespace, name string) error {
+	// first verify that this csr belongs to a kcertifier
+	var kc kcertifierv1alpha1.Kcertifier
+	if err := r.Get(ctx, types.NamespacedName{Namespace: namespace, Name: name}, &kc); err != nil {
+		if errors.IsNotFound(err) {
+			r.Recorder.Event(csr, WarningEventType, KcertifierNotFoundForCSREvent, "the kcertifier indicated in csr annotations was not found. skipping approval")
+			return nil
+		}
+		return fmt.Errorf("error getting kcertifier for csr: %s", err.Error())
+	}
+	// TODO this is race condition. appears csr can be created and get to this point before kc status is update with csr name
+	// perhaps we check this in reconciler requeue a max number of times
+	if kc.Status.CsrName != csr.Name {
+		r.Recorder.Event(csr, WarningEventType, KcertifierNotFoundForCSREvent, "the kcertifier indicated in this csr's annotations does not have a matching csr name")
+		return nil
+	}
 
+	r.Log.WithValues("csrName", csr.Name).Info("approving csr")
+	csrCopy := csr.DeepCopy()
 	approvalCondition := certificatesv1beta1.CertificateSigningRequestCondition{
-		Message: "Approved by KCertifier Controller",
+		Message: "Approved by Kcertifier Controller",
 		Reason:  "platform reasons",
 		Type:    certificatesv1beta1.CertificateApproved,
 	}
-
 	csrCopy.Status.Conditions = []certificatesv1beta1.CertificateSigningRequestCondition{approvalCondition}
-	_, err := r.CertClient.CertificateSigningRequests().UpdateApproval(csrCopy)
-	return err
+	if _, err := r.ApprovalClient.CertificateSigningRequests().UpdateApproval(csrCopy); err != nil {
+		return fmt.Errorf("error updating approved status in csr: %s", err.Error())
+	}
+	return nil
 }
-
-func (r *CertificateSigningRequestReconciler) retrieveCertificate(ctx context.Context, csr certificatesv1beta1.CertificateSigningRequest) error {
-	namespace := csr.Annotations[CSRAnnotation]
-	// It is not the job of this reconcile to create the secret, so we can assume the secret is there (and key-pending entry) or its an error
-	var existingSecret v1.Secret
-	if err := r.Get(ctx, types.NamespacedName{Namespace: namespace, Name: CertKeySecretName}, &existingSecret); err != nil {
-		r.Log.Error(err, "error retrieving cert-key secret")
-		return err
-	}
-
-	if len(existingSecret.Data[PendingKeyDataKey]) == 0 {
-		err := fmt.Errorf("missing pending key data in secret")
-		r.Log.Error(err, "error setting up certificate secret")
-		return err
-	}
-
-	secretCopy := existingSecret.DeepCopy()
-	if secretCopy.Annotations == nil {
-		secretCopy.Annotations = make(map[string]string)
-	}
-	secretCopy.Annotations[CertificateSecretAnnotation] = "true"
-	secretCopy.Annotations[OutputsAnnotation] = csr.Annotations[OutputsAnnotation]
-	secretCopy.Data = map[string][]byte{
-		CertKeySecretCertDataKey: csr.Status.Certificate,
-		CertKeySecretKeyDataKey:  existingSecret.Data[PendingKeyDataKey],
-	}
-	if err := r.Update(ctx, secretCopy); err != nil {
-		r.Log.Error(err, "error updating certificate secret")
-	}
-
-	return r.Delete(ctx, &csr)
-}
-
-
-

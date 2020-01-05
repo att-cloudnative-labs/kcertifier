@@ -1,0 +1,26 @@
+# permissions to do edit kcertifiers.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kcertifier-editor-role
+rules:
+- apiGroups:
+  - kcertifier.atteg.com
+  resources:
+  - kcertifiers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - kcertifier.atteg.com
+  resources:
+  - kcertifiers/status
+  verbs:
+  - get
+  - patch
+  - update

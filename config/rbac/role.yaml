@@ -7,6 +7,25 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
+  - certificates
+  resources:
+  - certificatesigningrequests
+  verbs:
+  - create
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - certificates
+  resources:
+  - certificatesigningrequests/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
   - certificates.k8s.io
   resources:
   - certificatesigningrequests
@@ -21,9 +40,24 @@ rules:
 - apiGroups:
   - certificates.k8s.io
   resources:
+  - certificatesigningrequests/approval
+  verbs:
+  - create
+  - update
+- apiGroups:
+  - certificates.k8s.io
+  resources:
   - certificatesigningrequests/status
   verbs:
   - get
+  - patch
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
   - patch
   - update
 - apiGroups:
@@ -59,9 +93,21 @@ rules:
   - update
   - watch
 - apiGroups:
-  - ""
+  - kcertifier.atteg.com
   resources:
-  - secrets/status
+  - kcertifiers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - kcertifier.atteg.com
+  resources:
+  - kcertifiers/status
   verbs:
   - get
   - patch

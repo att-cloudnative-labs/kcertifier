@@ -1,0 +1,7 @@
+apiVersion: kcertifier.atteg.com/v1alpha1
+kind: Kcertifier
+metadata:
+  name: kcertifier-sample
+spec:
+  # Add fields here
+  foo: bar
