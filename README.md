@@ -212,7 +212,7 @@ spec:
 
 Run (with kubectl context set to the target cluster):
 ```shell script
-make deploy IMG=docker.io/atteg/kcertifier:v0.9.0-alpha-3
+make deploy IMG=docker.io/atteg/kcertifier:v0.10.0-alpha-1
 ```
 
 ----
