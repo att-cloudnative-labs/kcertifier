@@ -34,6 +34,7 @@ import (
 )
 
 const (
+	// KcertifierNotFoundForCSREvent event for indicated csr not found
 	KcertifierNotFoundForCSREvent = "KcertifierNotFoundForCSR"
 )
 
@@ -53,6 +54,7 @@ type CertificateSigningRequestReconciler struct {
 // +kubebuilder:rbac:groups=kcertifier.atteg.com,resources=kcertifiers,verbs=get;list;watch
 // +kubebuilder:rbac:groups=kcertifier.atteg.com,resources=kcertifiers/status,verbs=get;update;patch
 
+// Reconcile control loop reconcile function
 func (r *CertificateSigningRequestReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
 
@@ -90,6 +92,7 @@ func (r *CertificateSigningRequestReconciler) Reconcile(req ctrl.Request) (ctrl.
 	return ctrl.Result{}, nil
 }
 
+// SetupWithManager - sets up reconcile to be called for this resource
 func (r *CertificateSigningRequestReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&certificatesv1beta1.CertificateSigningRequest{}).

@@ -102,6 +102,7 @@ options:
 ```yaml
 options:
   keystoreDataKey: "(default: keystore) key inside the secret data for the pkcs12 data"
+  alias: "(default: 1) keystore alias"
   passwordSecretNamespaceName: "(optional) namespace and name of the secret containing password used to encrypt the keystore in the format namespace/name. if not set, default password 'changeit' is used"
   passwordSecretKey: "(optional) key inside the secret named by passwordSecretNamespaceName option that has the password data. If passwordSecretNamespaceName is set and this is not, it is expected that there is only one key in the secret otherwise it is an error"
 ```

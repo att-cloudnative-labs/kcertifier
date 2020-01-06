@@ -43,44 +43,77 @@ import (
 )
 
 const (
-	AllowGlobalImportAnnotation       = "kcertifier.atteg.com/allow-global-import"
-	GlobalPasswordSecretAnnotation    = "kcertifier.atteg.com/global-password-secret"
-	KcertifierSpecHashAnnotation      = "kcertifier.atteg.com/kcertifier-spec-hash"
+	// AllowGlobalImportAnnotation allow import from other namespaces annotation
+	AllowGlobalImportAnnotation = "kcertifier.atteg.com/allow-global-import"
+	// GlobalPasswordSecretAnnotation secret containing keystore password annotation
+	GlobalPasswordSecretAnnotation = "kcertifier.atteg.com/global-password-secret"
+	// KcertifierSpecHashAnnotation kcertifier spec hash value annotation
+	KcertifierSpecHashAnnotation = "kcertifier.atteg.com/kcertifier-spec-hash"
+	// KcertifierNamespaceNameAnnotation kcertifier namespace/name annotation
 	KcertifierNamespaceNameAnnotation = "kcertifier.atteg.com/kcertifier-namespace-name"
 
-	DefaultKeyLength      = 2048
-	DefaultPemKeyDataKey  = "key.pem"
+	// DefaultKeyLength default key length
+	DefaultKeyLength = 2048
+	// DefaultPemKeyDataKey default pem data key
+	DefaultPemKeyDataKey = "key.pem"
+	// DefaultPemCertDataKey default pem cert key
 	DefaultPemCertDataKey = "cert.pem"
-	DefaultPkcs12DataKey  = "keystore.p12"
-	DefaultJksDataKey     = "keystore.jks"
-	DefaultKeystoreAlias  = "1"
+	// DefaultPkcs12DataKey default pkcs12 data key
+	DefaultPkcs12DataKey = "keystore.p12"
+	// DefaultJksDataKey default jks data key
+	DefaultJksDataKey = "keystore.jks"
+	// DefaultKeystoreAlias default keystore alias
+	DefaultKeystoreAlias = "1"
 
-	PrivateKeyPemType         = "PRIVATE KEY"
+	// PrivateKeyPemType type header for private key pem block
+	PrivateKeyPemType = "PRIVATE KEY"
+	// CertificateRequestPemType type header for csr
 	CertificateRequestPemType = "CERTIFICATE REQUEST"
 
-	NormalEventType                 = "Normal"
-	WarningEventType                = "Warning"
-	BuildingPackageEvent            = "BuildingPackage"
-	CreatingCSREvent                = "CreatingCSR"
-	AnnotatingCSREvent              = "AnnotatingCSR"
-	CreatingKeySecretEvent          = "CreatingKeySecret"
-	DeletingKeySecretEvent          = "DeletingKeySecret"
-	DeletingCsrEvent                = "DeletingCSR"
-	InvalidKcertifierEvent          = "InvalidKcertifier"
-	InvalidImportSecretEvent        = "InvalidImportSecret"
-	InvalidPasswordSecretEvent      = "InvalidPasswordSecret"
+	// NormalEventType normal event
+	NormalEventType = "Normal"
+	// WarningEventType warning event
+	WarningEventType = "Warning"
+	// BuildingPackageEvent building package event
+	BuildingPackageEvent = "BuildingPackage"
+	// CreatingCSREvent creating csr event
+	CreatingCSREvent = "CreatingCSR"
+	// AnnotatingCSREvent annotating csr event
+	AnnotatingCSREvent = "AnnotatingCSR"
+	// CreatingKeySecretEvent creating key secret event
+	CreatingKeySecretEvent = "CreatingKeySecret"
+	// DeletingKeySecretEvent deleting key secret event
+	DeletingKeySecretEvent = "DeletingKeySecret"
+	// DeletingCsrEvent deleting csr event
+	DeletingCsrEvent = "DeletingCSR"
+	// InvalidKcertifierEvent invalid kcertifier event
+	InvalidKcertifierEvent = "InvalidKcertifier"
+	// InvalidImportSecretEvent invalid import secret event
+	InvalidImportSecretEvent = "InvalidImportSecret"
+	// InvalidPasswordSecretEvent invalid password secret event
+	InvalidPasswordSecretEvent = "InvalidPasswordSecret"
+	// ImportKcertifierNotAllowedEvent import kcertifier not allowed event
 	ImportKcertifierNotAllowedEvent = "ImportKcertifierNotAllowed"
 
+	// KeySecretGenerateName key secret generate name
 	KeySecretGenerateName = "kcertifier-key-"
-	KeySecretKey          = "key"
-	CsrGenerateName       = "kcertifier-csr-"
+	// KeySecretKey key secret data key
+	KeySecretKey = "key"
+	// CsrGenerateName csr generate name
+	CsrGenerateName = "kcertifier-csr-"
 
-	CertDataKeyOption                 = "certDataKey"
-	KeyDataKeyOption                  = "keyDataKey"
-	KeystoreDataKeyOption             = "keystoreDataKey"
-	KeystoreAliasOption               = "alias"
+	// CertDataKeyOption cert data key option
+	CertDataKeyOption = "certDataKey"
+	// KeyDataKeyOption key data key option
+	KeyDataKeyOption = "keyDataKey"
+	// KeystoreDataKeyOption keystore data key option
+	KeystoreDataKeyOption = "keystoreDataKey"
+	// KeystoreAliasOption keystore alias option
+	KeystoreAliasOption = "alias"
+	// PasswordSecretNamespaceNameOption password secret namespace name option
 	PasswordSecretNamespaceNameOption = "passwordSecretNamespaceName"
-	PasswordSecretKeyOption           = "passwordSecretKey"
+	// PasswordSecretKeyOption password secret key option
+	PasswordSecretKeyOption = "passwordSecretKey"
 )
 
 // KcertifierReconciler reconciles a Kcertifier object
@@ -100,6 +133,7 @@ type KcertifierReconciler struct {
 // +kubebuilder:rbac:groups=certificates,resources=certificatesigningrequests/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=core,resources=events,verbs=create;update;patch
 
+// Reconcile control loop reconcile function
 func (r *KcertifierReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
 
@@ -110,7 +144,7 @@ func (r *KcertifierReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) 
 	}
 
 	// update hash of kcertifier spec
-	hash, err := GetKcertifierSpecHash(&kc)
+	hash, err := getKcertifierSpecHash(&kc)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("error getting kcertifier spec hash: %s", err.Error())
 	}
@@ -201,6 +235,7 @@ func (r *KcertifierReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) 
 	return ctrl.Result{}, nil
 }
 
+// SetupWithManager - sets up reconciler to be called for this resource
 func (r *KcertifierReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&kcertifierv1alpha1.Kcertifier{}).
@@ -219,11 +254,11 @@ func (r *KcertifierReconciler) packagesComplete(ctx context.Context, kc *kcertif
 			return false, fmt.Errorf("error getting package secret: %s", err.Error())
 		}
 		// Check package keys present
-		if !IsCertAndKeyPresentInPkg(secret, pkg, kc.Status.KcertifierSpecHash) {
+		if !isCertAndKeyPresentInPkg(secret, pkg, kc.Status.KcertifierSpecHash) {
 			return false, nil
 		}
 		// Check imports present
-		if !IsImportsPresentInPkg(secret, pkg) {
+		if !isImportsPresentInPkg(secret, pkg) {
 			return false, nil
 		}
 	}
@@ -240,7 +275,7 @@ func (r *KcertifierReconciler) componentsPresent(ctx context.Context, kc *kcerti
 				return false, fmt.Errorf("error getting pacakge secret: %s", err.Error())
 			}
 		} else {
-			if IsCertAndKeyPresentInPkg(secret, pkg, kc.Status.KcertifierSpecHash) {
+			if isCertAndKeyPresentInPkg(secret, pkg, kc.Status.KcertifierSpecHash) {
 				continue
 			}
 		}
@@ -417,10 +452,10 @@ func (r *KcertifierReconciler) buildPackages(ctx context.Context, kc *kcertifier
 
 func (r *KcertifierReconciler) buildPemPackage(ctx context.Context, pkg kcertifierv1alpha1.Package, kc *kcertifierv1alpha1.Kcertifier, secret *v1.Secret) error {
 	r.Recorder.Event(kc, NormalEventType, BuildingPackageEvent, BuildingPackageEvent)
-	certDataKey, keyDataKey := GetPemDataKeys(pkg)
+	certDataKey, keyDataKey := getPemDataKeys(pkg)
 	// This implies that if the package already has any non-null value for the keys, it must already be up-to-date
 	// Eventually this should check against some sort of hash/version of kcertifier spec and possibly the CA version/hash
-	if !IsCertAndKeyPresentInPkg(*secret, pkg, kc.Status.KcertifierSpecHash) {
+	if !isCertAndKeyPresentInPkg(*secret, pkg, kc.Status.KcertifierSpecHash) {
 		certBytes, err := r.retrieveCertFromCsr(ctx, kc)
 		if err != nil {
 			return fmt.Errorf("error retrieving cert from csr: %s", err.Error())
@@ -437,10 +472,10 @@ func (r *KcertifierReconciler) buildPemPackage(ctx context.Context, pkg kcertifi
 
 func (r *KcertifierReconciler) buildPkcs12Package(ctx context.Context, pkg kcertifierv1alpha1.Package, kc *kcertifierv1alpha1.Kcertifier, secret *v1.Secret) error {
 	r.Recorder.Event(kc, NormalEventType, BuildingPackageEvent, BuildingPackageEvent)
-	pkcs12DataKey := GetP12DataKey(pkg)
+	pkcs12DataKey := getP12DataKey(pkg)
 	// This implies that if the package already has any non-null value for the keys, it must already be up-to-date
 	// Eventually this should check against some sort of hash/version of kcertifier spec and possibly the CA version/hash
-	if !IsCertAndKeyPresentInPkg(*secret, pkg, kc.Status.KcertifierSpecHash) {
+	if !isCertAndKeyPresentInPkg(*secret, pkg, kc.Status.KcertifierSpecHash) {
 		certBytes, err := r.retrieveCertFromCsr(ctx, kc)
 		if err != nil {
 			return err
@@ -457,7 +492,7 @@ func (r *KcertifierReconciler) buildPkcs12Package(ctx context.Context, pkg kcert
 		if !ok {
 			alias = DefaultKeystoreAlias
 		}
-		pkcs12Bytes, err := CreatePkcs12(certBytes, keyBytes, password, alias)
+		pkcs12Bytes, err := createPkcs12(certBytes, keyBytes, password, alias)
 		if err != nil {
 			return fmt.Errorf("error creating pkcs12 for kcertifier, %s: %s", kc.Name, err.Error())
 		}
@@ -468,8 +503,8 @@ func (r *KcertifierReconciler) buildPkcs12Package(ctx context.Context, pkg kcert
 
 func (r *KcertifierReconciler) buildJksPackage(ctx context.Context, pkg kcertifierv1alpha1.Package, kc *kcertifierv1alpha1.Kcertifier, secret *v1.Secret) error {
 	r.Recorder.Event(kc, NormalEventType, BuildingPackageEvent, BuildingPackageEvent)
-	jksDataKey := GetJksDataKey(pkg)
-	if !IsCertAndKeyPresentInPkg(*secret, pkg, kc.Status.KcertifierSpecHash) {
+	jksDataKey := getJksDataKey(pkg)
+	if !isCertAndKeyPresentInPkg(*secret, pkg, kc.Status.KcertifierSpecHash) {
 		certBytes, err := r.retrieveCertFromCsr(ctx, kc)
 		if err != nil {
 			return fmt.Errorf("error retrieving cert from csr: %s", err.Error())

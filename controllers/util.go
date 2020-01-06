@@ -15,10 +15,11 @@ import (
 )
 
 const (
+	// FriendlyNameHeader keystore attribute for alias/friendlyName
 	FriendlyNameHeader = "friendlyName"
 )
 
-func GetKcertifierSpecHash(kc *kcertifierv1alpha1.Kcertifier) (string, error) {
+func getKcertifierSpecHash(kc *kcertifierv1alpha1.Kcertifier) (string, error) {
 	hasher := fnv.New32a()
 	hasher.Reset()
 	printer := spew.ConfigState{
@@ -35,7 +36,7 @@ func GetKcertifierSpecHash(kc *kcertifierv1alpha1.Kcertifier) (string, error) {
 	return k8srand.SafeEncodeString(fmt.Sprint(hasher.Sum32())), nil
 }
 
-func IsCertAndKeyPresentInPkg(secret v1.Secret, pkg kcertifierv1alpha1.Package, hash string) bool {
+func isCertAndKeyPresentInPkg(secret v1.Secret, pkg kcertifierv1alpha1.Package, hash string) bool {
 	// check kcertifier hash
 	pkgHash, ok := secret.Annotations[KcertifierSpecHashAnnotation]
 	if !ok || pkgHash != hash {
@@ -43,7 +44,7 @@ func IsCertAndKeyPresentInPkg(secret v1.Secret, pkg kcertifierv1alpha1.Package, 
 	}
 	switch strings.ToLower(pkg.Type) {
 	case "pem":
-		certKey, keyKey := GetPemDataKeys(pkg)
+		certKey, keyKey := getPemDataKeys(pkg)
 		if _, found := secret.Data[certKey]; !found {
 			return false
 		}
@@ -51,12 +52,12 @@ func IsCertAndKeyPresentInPkg(secret v1.Secret, pkg kcertifierv1alpha1.Package, 
 			return false
 		}
 	case "pkcs12":
-		key := GetP12DataKey(pkg)
+		key := getP12DataKey(pkg)
 		if _, found := secret.Data[key]; !found {
 			return false
 		}
 	case "jks":
-		key := GetJksDataKey(pkg)
+		key := getJksDataKey(pkg)
 		if _, found := secret.Data[key]; !found {
 			return false
 		}
@@ -66,7 +67,7 @@ func IsCertAndKeyPresentInPkg(secret v1.Secret, pkg kcertifierv1alpha1.Package, 
 	return true
 }
 
-func IsImportsPresentInPkg(secret v1.Secret, pkg kcertifierv1alpha1.Package) bool {
+func isImportsPresentInPkg(secret v1.Secret, pkg kcertifierv1alpha1.Package) bool {
 	for _, _import := range pkg.Imports {
 		if len(_import.TargetKey) == 0 {
 			return false
@@ -78,7 +79,7 @@ func IsImportsPresentInPkg(secret v1.Secret, pkg kcertifierv1alpha1.Package) boo
 	return true
 }
 
-func GetPemDataKeys(pkg kcertifierv1alpha1.Package) (string, string) {
+func getPemDataKeys(pkg kcertifierv1alpha1.Package) (string, string) {
 	cert, found := pkg.Options[CertDataKeyOption]
 	if !found {
 		cert = DefaultPemCertDataKey
@@ -90,7 +91,7 @@ func GetPemDataKeys(pkg kcertifierv1alpha1.Package) (string, string) {
 	return cert, key
 }
 
-func GetP12DataKey(pkg kcertifierv1alpha1.Package) string {
+func getP12DataKey(pkg kcertifierv1alpha1.Package) string {
 	p12, found := pkg.Options[KeystoreDataKeyOption]
 	if !found {
 		return DefaultPkcs12DataKey
@@ -98,7 +99,7 @@ func GetP12DataKey(pkg kcertifierv1alpha1.Package) string {
 	return p12
 }
 
-func GetJksDataKey(pkg kcertifierv1alpha1.Package) string {
+func getJksDataKey(pkg kcertifierv1alpha1.Package) string {
 	jks, found := pkg.Options[KeystoreDataKeyOption]
 	if !found {
 		return DefaultJksDataKey
@@ -106,7 +107,7 @@ func GetJksDataKey(pkg kcertifierv1alpha1.Package) string {
 	return jks
 }
 
-func CreatePkcs12(certPemBytes []byte, keyPemBytes []byte, password string, alias string) ([]byte, error) {
+func createPkcs12(certPemBytes []byte, keyPemBytes []byte, password string, alias string) ([]byte, error) {
 	certBlock, _ := pem.Decode(certPemBytes)
 	if certBlock == nil {
 		return nil, fmt.Errorf("error creating keystore. no pem data found")

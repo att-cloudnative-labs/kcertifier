@@ -35,12 +35,17 @@ import (
 )
 
 const (
-	ImportKcertifierNamespaceNameAnnotation      = "kcertifier.atteg.com/import-kcertifier"
+	// ImportKcertifierNamespaceNameAnnotation annotation indicating which kcertifier to import
+	ImportKcertifierNamespaceNameAnnotation = "kcertifier.atteg.com/import-kcertifier"
+	// ImportKcertifierOverrideCommonNameAnnotation override common name annotation
 	ImportKcertifierOverrideCommonNameAnnotation = "kcertifier.atteg.com/override-common-name"
-	ImportKcertifierOverrideSansAnnotation       = "kcertifier.atteg.com/override-sans"
+	// ImportKcertifierOverrideSansAnnotation override sans annotation
+	ImportKcertifierOverrideSansAnnotation = "kcertifier.atteg.com/override-sans"
 
+	// ImportKcertifierNotFoundEvent event when indicated kcertifier not found
 	ImportKcertifierNotFoundEvent = "ImportKcertifierNotFound"
-	ImportKcertifierNotAnnotated  = "ImportKcertifierNotAnnotated"
+	// ImportKcertifierNotAnnotated event when indicated kcertifier does not have annotation to allow import
+	ImportKcertifierNotAnnotated = "ImportKcertifierNotAnnotated"
 )
 
 // NamespaceReconciler reconciles a Namespace object
@@ -56,6 +61,7 @@ type NamespaceReconciler struct {
 // +kubebuilder:rbac:groups=core,resources=namespaces/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=kcertifier.atteg.com,resources=kcertifiers,verbs=get;list;watch;create;update;patch
 
+// Reconcile control loop reconcile function
 func (r *NamespaceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
 
@@ -137,6 +143,7 @@ func (r *NamespaceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	return ctrl.Result{}, nil
 }
 
+// SetupWithManager - sets up reconciler to be called for this resource
 func (r *NamespaceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&corev1.Namespace{}).
