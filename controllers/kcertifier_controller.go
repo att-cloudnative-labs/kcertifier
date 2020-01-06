@@ -404,6 +404,8 @@ func (r *KcertifierReconciler) buildPackages(ctx context.Context, kc *kcertifier
 			secretCopy.Data = map[string][]byte{}
 		}
 		switch strings.ToLower(pkg.Type) {
+		case "none":
+			// for 'import-only' packages. no-op
 		case "pem":
 			if err := r.buildPemPackage(ctx, pkg, kc, secretCopy); err != nil {
 				return fmt.Errorf("error building pem package: %s", err.Error())

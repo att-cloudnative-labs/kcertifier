@@ -40,7 +40,9 @@
 
 Kcertifier is a custom controller for a custom resource, Kcertifier, that defines a desired TLS certificate to be provisioned by the cluster CA as well as the type of packaging (PEM, PKCS12, and JKS), which the controller will then reconcile into a Kubernetes secret.
 
-A Kcertifier resource has fields to indicate keylength, subject information (common-name, country, org, locality,...), alternate names, format of the certificate file(s) or keystore (package), and any associated password secrets. It also allows you to indicate that you would like to add any arbitrary key/values from another secret. An example of this use could be if you had an existing secret containing a truststore, you could indicate that you want to add that key value to the certificate secret that the controller will create so that the keystore and truststore could be in  a single secret. There is also a field for indicating an a secret from which to extract the keystore password (for keystore types of packages).
+A Kcertifier resource has fields to indicate key length, subject information (common-name, country, org, locality,...), alternate names, format of the certificate file(s) or keystore (package), and any associated password secrets. It also allows you to indicate that you would like to add any arbitrary key/values from another secret. An example of this use could be if you had an existing secret containing a truststore, you could indicate that you want to add that key value to the certificate secret that the controller will create so that the keystore and truststore could be in  a single secret. There is also a field for indicating an a secret from which to extract the keystore password (for keystore types of packages).
+
+One note about the 'none' package type. This type can be used for an import-only package (no certificate, key or keystore is put into package). If there are no packages other than 'none' in the kcertifier, no rsa key or csr will be created. The motivation behind this package type is to allow kcertifier to handle creation of any ancillary secrets related to SSL certificates such as a root certificates that exists in another secret. 
 
 When a Kcertifier resource is created or modified, a RSA key will be created and used to create a CSR according to the specs defined in the Kcertifier resource. The controller will then approve then certificate and create a secret with the resulting key and certificate in the format or formats (multiple outputs per Kcertifier allowed) specified.
 
@@ -71,7 +73,7 @@ subject:
   organizationalUnit: "organizational unit"
 sans: "[] list of alternate server names"
 packages: "[] list of output secrets"
-  - type: "cert/key or keystore format. valid values are 'pem', 'pkcs12', and 'jks'"
+  - type: "cert/key or keystore format. valid values are 'pem', 'pkcs12', 'jks', and 'none'"
     secretName: "name of the output secret"
     labels: "[map] key/value pairs of labels to put in output secret metadata"
     annotations: "[map] key/value pairs of annotations to put in output secret metadata. **some controller specific annotations will also be added to the output secret"

@@ -43,6 +43,8 @@ func isCertAndKeyPresentInPkg(secret v1.Secret, pkg kcertifierv1alpha1.Package, 
 		return false
 	}
 	switch strings.ToLower(pkg.Type) {
+	case "none":
+		// for 'import-only' packages. no-op
 	case "pem":
 		certKey, keyKey := getPemDataKeys(pkg)
 		if _, found := secret.Data[certKey]; !found {
