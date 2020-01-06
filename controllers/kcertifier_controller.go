@@ -272,7 +272,7 @@ func (r *KcertifierReconciler) componentsPresent(ctx context.Context, kc *kcerti
 		var secret v1.Secret
 		if err := r.getPackageSecret(ctx, pkg, kc, &secret); err != nil {
 			if !errors.IsNotFound(err) {
-				return false, fmt.Errorf("error getting pacakge secret: %s", err.Error())
+				return false, fmt.Errorf("error getting package secret: %s", err.Error())
 			}
 		} else {
 			if isCertAndKeyPresentInPkg(secret, pkg, kc.Status.KcertifierSpecHash) {

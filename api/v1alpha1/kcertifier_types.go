@@ -35,6 +35,7 @@ type KcertifierSpec struct {
 	Packages []Package `json:"packages,omitempty"`
 }
 
+// Subject x509 certificate subject information
 type Subject struct {
 	// +kubebuilder:validation:Required
 	CommonName string `json:"commonName,omitempty"`
@@ -50,6 +51,7 @@ type Subject struct {
 	OrganizationalUnit string `json:"organizationalUnit,omitempty"`
 }
 
+// Package defines output secret parameters
 type Package struct {
 	// +kubebuilder:validation:Required
 	Type string `json:"type,omitempty"`
@@ -65,6 +67,7 @@ type Package struct {
 	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
+// Import defines data to copy from another secret into the package
 type Import struct {
 	// +kubebuilder:validation:Optional
 	Namespace string `json:"namespace,omitempty"`
