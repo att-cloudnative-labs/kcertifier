@@ -44,7 +44,7 @@ A Kcertifier resource has fields to indicate key length, subject information (co
 
 One note about the 'none' package type. This type can be used for an import-only package (no certificate, key or keystore is put into package). If there are no packages other than 'none' in the kcertifier, no rsa key or csr will be created. The motivation behind this package type is to allow kcertifier to handle creation of any ancillary secrets related to SSL certificates such as a root certificates that exists in another secret. 
 
-When a Kcertifier resource is created or modified, a RSA key will be created and used to create a CSR according to the specs defined in the Kcertifier resource. The controller will then approve then certificate and create a secret with the resulting key and certificate in the format or formats (multiple outputs per Kcertifier allowed) specified.
+When a Kcertifier resource is created or modified, an RSA key will be created and used to create a CSR according to the specs defined in the Kcertifier resource. The controller will then approve the certificate and create a secret with the resulting key and certificate in the format or formats (multiple outputs per Kcertifier allowed) specified.
 
 The kcertifier controller also allows you to annotate a namespace with the namespace/name of an existing Kcertifier resource from another namespace to copy and add to the annotated namespace. This allows you to easily copy a particular Kcertifier resource that has a format that will be used widely in many namespaces. The namespace can be annotated with an additional annotation that allows you to override the common-name in the imported Kcertifier resource.
 
@@ -52,7 +52,7 @@ The kcertifier controller also allows you to annotate a namespace with the names
 
 ### Security
 
-The premise of Kcertifier controller is to facility automated creation of TLS certificates to some specification with support for keystore formats. Anyone with the permissions to create/update Kcertifier resources can effectively sign certificates in the name of the cluster CA. Therefore RBAC permissions for Kcertifiers must be considered and configured appropriately. The inspiration for this project was in a opinionated platform where service accounts for platform-related automation tooling and platform admins had permissions to create Kcertifier resources.
+The premise of Kcertifier controller is to facilitate automated creation of TLS certificates to some specification with support for keystore formats. Anyone with the permissions to create/update Kcertifier resources can effectively sign certificates in the name of the cluster CA. Therefore RBAC permissions for Kcertifiers must be considered and configured appropriately. The inspiration for this project was in a opinionated platform where service accounts for platform-related automation tooling and platform admins had permissions to create Kcertifier resources.
 
 The import of secrets into the packages defined in Kcertifiers could be a potential security risk in certain scenarios. First note that, by default, you can't import data from namespaces outside of that of the Kcertifier resource. There is a controller wide setting that allows imports from other namespaces. Proceed with caution when enabling this. Also note that the secret with the data being imported must be annotated to signify that it is allowing Kcertifiers to import its data.
 
@@ -178,11 +178,11 @@ metadata:
 spec:
   keyLength: 2048
   subject:
-    commonName: mykcjkscert.atteg.com
+    commonName: mykcjkscert.example.com
     country: US
-    locality: El Segundo
-    organization: AT&T
-    organizationalUnit: Mobility & Entertainment
+    locality: Los Angeles
+    organization: ExampleInc
+    organizationalUnit: ExampleOrg
     stateOrProvince: CA
   sans:
   - "alt1.example.com"

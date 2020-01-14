@@ -61,6 +61,7 @@ spec:
               type: integer
             packages:
               items:
+                description: Package defines output secret parameters
                 properties:
                   annotations:
                     additionalProperties:
@@ -68,6 +69,8 @@ spec:
                     type: object
                   imports:
                     items:
+                      description: Import defines data to copy from another secret
+                        into the package
                       properties:
                         namespace:
                           type: string
@@ -100,6 +103,7 @@ spec:
                 type: string
               type: array
             subject:
+              description: Subject x509 certificate subject information
               properties:
                 commonName:
                   type: string
