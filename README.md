@@ -121,6 +121,8 @@ These are command line arguments to the controller
 --allow-global-imports: "(default: false) Allow the import of secret data from external namespaces"
 --allow-global-password-secret: "(default false) Allow keystore passwords to come from external namespaces"
 --allow-namespace-auto-import: "(default false) Allow annotated namespaces to automatically import kcertifier from another namespace"
+--check-cert-validity: "(default false) Check the expiration annotatin of each package secret and replace if within grace-period duration before certificate expiration"
+--certValidityGracePeriod: "(default: 720h) Duration before certificate expiration before eligible to have a certificate package renewed"
 ```
 
 ----

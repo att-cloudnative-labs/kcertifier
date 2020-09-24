@@ -54,12 +54,16 @@ func main() {
 	var allowGlobalImports bool
 	var allowGlobalPasswordSecret bool
 	var allowNamespaceAutoImport bool
+	var checkCertificateValidity bool
+	var certValidityGracePeriod string
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
 		"Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.")
 	flag.BoolVar(&allowGlobalImports, "allow-global-imports", false, "Allow the import of secret data from external namespaces. Source secret needs to be annotated to allow import")
 	flag.BoolVar(&allowGlobalPasswordSecret, "allow-global-password-secret", false, "Allow keystore passwords to come from external namespaces. Source secret needs to be annotated to allow this")
 	flag.BoolVar(&allowNamespaceAutoImport, "allow-namespace-auto-import", false, "Allow annotated namespaces to automatically import kcertifier from another namespace")
+	flag.BoolVar(&checkCertificateValidity, "check-cert-validity", false, "Check certificate expiration on package secrets and replace if expiration is within grace period")
+	flag.StringVar(&certValidityGracePeriod, "cert-valid-grace", "720h", "Duration before expiration before replacing certificate in package secret (go duration: s,m,h)")
 	flag.Parse()
 
 	ctrl.SetLogger(zap.New(func(o *zap.Options) {
@@ -79,6 +83,11 @@ func main() {
 		os.Exit(1)
 	}
 
+	grace, err := time.ParseDuration(certValidityGracePeriod)
+	if err != nil {
+		setupLog.Error(err, "invalid duration for cert-valid-grace")
+		os.Exit(1)
+	}
 	if err = (&controllers.KcertifierReconciler{
 		Client:                    mgr.GetClient(),
 		Log:                       ctrl.Log.WithName("controllers").WithName("Kcertifier"),
@@ -86,6 +95,8 @@ func main() {
 		Recorder:                  mgr.GetEventRecorderFor("Kcertifier"),
 		AllowGlobalImports:        allowGlobalImports,
 		AllowGlobalPasswordSecret: allowGlobalPasswordSecret,
+		CheckCertificateValidity: checkCertificateValidity,
+		CertificateValidityGrace: grace,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Kcertifier")
 		os.Exit(1)

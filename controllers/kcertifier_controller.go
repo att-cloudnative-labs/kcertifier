@@ -30,6 +30,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"time"
 
 	"github.com/pavel-v-chernykh/keystore-go"
 	"k8s.io/api/certificates/v1beta1"
@@ -51,6 +52,8 @@ const (
 	KcertifierSpecHashAnnotation = "kcertifier.atteg.com/kcertifier-spec-hash"
 	// KcertifierNamespaceNameAnnotation kcertifier namespace/name annotation
 	KcertifierNamespaceNameAnnotation = "kcertifier.atteg.com/kcertifier-namespace-name"
+	// KcertifierCertExpirationAnnotation certificate expiration (notAfter)
+	KcertifierCertExpirationAnnotation = "kcertifier.atteg.com/certificate-not-after"
 
 	// DefaultKeyLength default key length
 	DefaultKeyLength = 2048
@@ -124,6 +127,8 @@ type KcertifierReconciler struct {
 	Scheme                    *runtime.Scheme
 	AllowGlobalImports        bool
 	AllowGlobalPasswordSecret bool
+	CheckCertificateValidity  bool
+	CertificateValidityGrace  time.Duration
 }
 
 // +kubebuilder:rbac:groups=kcertifier.atteg.com,resources=kcertifiers,verbs=get;list;watch;create;update;patch;delete
@@ -254,7 +259,7 @@ func (r *KcertifierReconciler) packagesComplete(ctx context.Context, kc *kcertif
 			return false, fmt.Errorf("error getting package secret: %s", err.Error())
 		}
 		// Check package keys present
-		if !isCertAndKeyPresentInPkg(secret, pkg, kc.Status.KcertifierSpecHash) {
+		if !r.isCertAndKeyPresentInPkg(secret, pkg, kc.Status.KcertifierSpecHash) {
 			return false, nil
 		}
 		// Check imports present
@@ -275,7 +280,7 @@ func (r *KcertifierReconciler) componentsPresent(ctx context.Context, kc *kcerti
 				return false, fmt.Errorf("error getting package secret: %s", err.Error())
 			}
 		} else {
-			if isCertAndKeyPresentInPkg(secret, pkg, kc.Status.KcertifierSpecHash) {
+			if r.isCertAndKeyPresentInPkg(secret, pkg, kc.Status.KcertifierSpecHash) {
 				continue
 			}
 		}
@@ -457,7 +462,8 @@ func (r *KcertifierReconciler) buildPemPackage(ctx context.Context, pkg kcertifi
 	certDataKey, keyDataKey := getPemDataKeys(pkg)
 	// This implies that if the package already has any non-null value for the keys, it must already be up-to-date
 	// Eventually this should check against some sort of hash/version of kcertifier spec and possibly the CA version/hash
-	if !isCertAndKeyPresentInPkg(*secret, pkg, kc.Status.KcertifierSpecHash) {
+
+	if !r.isCertAndKeyPresentInPkg(*secret, pkg, kc.Status.KcertifierSpecHash) {
 		certBytes, err := r.retrieveCertFromCsr(ctx, kc)
 		if err != nil {
 			return fmt.Errorf("error retrieving cert from csr: %s", err.Error())
@@ -466,6 +472,15 @@ func (r *KcertifierReconciler) buildPemPackage(ctx context.Context, pkg kcertifi
 		if err != nil {
 			return fmt.Errorf("error retrieving key from key secret: %s", err.Error())
 		}
+
+		if secret.Annotations == nil {
+			secret.Annotations = make(map[string]string)
+		}
+		certNotAfter, err := getCertificateExpirationFromPemBytes(certBytes)
+		if err != nil {
+			return fmt.Errorf("error getting certificate expiration: %s", err.Error())
+		}
+		secret.Annotations[KcertifierCertExpirationAnnotation] = certNotAfter.Format(time.RFC3339Nano)
 		secret.Data[certDataKey] = certBytes
 		secret.Data[keyDataKey] = keyBytes
 	}
@@ -477,7 +492,7 @@ func (r *KcertifierReconciler) buildPkcs12Package(ctx context.Context, pkg kcert
 	pkcs12DataKey := getP12DataKey(pkg)
 	// This implies that if the package already has any non-null value for the keys, it must already be up-to-date
 	// Eventually this should check against some sort of hash/version of kcertifier spec and possibly the CA version/hash
-	if !isCertAndKeyPresentInPkg(*secret, pkg, kc.Status.KcertifierSpecHash) {
+	if !r.isCertAndKeyPresentInPkg(*secret, pkg, kc.Status.KcertifierSpecHash) {
 		certBytes, err := r.retrieveCertFromCsr(ctx, kc)
 		if err != nil {
 			return err
@@ -506,7 +521,7 @@ func (r *KcertifierReconciler) buildPkcs12Package(ctx context.Context, pkg kcert
 func (r *KcertifierReconciler) buildJksPackage(ctx context.Context, pkg kcertifierv1alpha1.Package, kc *kcertifierv1alpha1.Kcertifier, secret *v1.Secret) error {
 	r.Recorder.Event(kc, NormalEventType, BuildingPackageEvent, BuildingPackageEvent)
 	jksDataKey := getJksDataKey(pkg)
-	if !isCertAndKeyPresentInPkg(*secret, pkg, kc.Status.KcertifierSpecHash) {
+	if !r.isCertAndKeyPresentInPkg(*secret, pkg, kc.Status.KcertifierSpecHash) {
 		certBytes, err := r.retrieveCertFromCsr(ctx, kc)
 		if err != nil {
 			return fmt.Errorf("error retrieving cert from csr: %s", err.Error())
@@ -855,4 +870,70 @@ func (r *KcertifierReconciler) getPasswordSecret(ctx context.Context, pkg kcerti
 	}
 	//TODO VALIDATE GlobalPasswordSecretAnnotation
 	return r.Get(ctx, namespacedName, s)
+}
+
+func getCertificateExpirationFromPemBytes(pemBytes []byte) (time.Time, error) {
+	block, _ := pem.Decode(pemBytes)
+	if block == nil {
+		return time.Time{}, fmt.Errorf("error reading block from certificate PEM")
+	}
+
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("error parsing certificate from pem block: %s", err.Error())
+	}
+	return cert.NotAfter, nil
+}
+
+func (r *KcertifierReconciler) isExpirationAnnotationValid(secret v1.Secret) bool {
+	if secret.Annotations == nil {
+		return false
+	}
+	if _, ok := secret.Annotations[KcertifierCertExpirationAnnotation]; !ok {
+		return false
+	}
+
+	notAfter, err := time.Parse(time.RFC3339Nano, secret.Annotations[KcertifierCertExpirationAnnotation])
+	if err != nil {
+		r.Log.Error(err, "invalid time in certificate expiration annotation")
+		return false
+	}
+	return time.Now().Before(notAfter.Add(- r.CertificateValidityGrace))
+
+}
+
+func (r *KcertifierReconciler) isCertAndKeyPresentInPkg(secret v1.Secret, pkg kcertifierv1alpha1.Package, hash string) bool {
+	if r.CheckCertificateValidity && !r.isExpirationAnnotationValid(secret) {
+		return false
+	}
+	// check kcertifier hash
+	pkgHash, ok := secret.Annotations[KcertifierSpecHashAnnotation]
+	if !ok || pkgHash != hash {
+		return false
+	}
+	switch strings.ToLower(pkg.Type) {
+	case "none":
+		// for 'import-only' packages. no-op
+	case "pem":
+		certKey, keyKey := getPemDataKeys(pkg)
+		if _, found := secret.Data[certKey]; !found {
+			return false
+		}
+		if _, found := secret.Data[keyKey]; !found {
+			return false
+		}
+	case "pkcs12":
+		key := getP12DataKey(pkg)
+		if _, found := secret.Data[key]; !found {
+			return false
+		}
+	case "jks":
+		key := getJksDataKey(pkg)
+		if _, found := secret.Data[key]; !found {
+			return false
+		}
+	default:
+		return false
+	}
+	return true
 }

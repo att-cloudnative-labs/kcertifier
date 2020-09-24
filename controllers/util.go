@@ -11,7 +11,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	k8srand "k8s.io/apimachinery/pkg/util/rand"
 	"software.sslmate.com/src/go-pkcs12"
-	"strings"
 )
 
 const (
@@ -34,39 +33,6 @@ func getKcertifierSpecHash(kc *kcertifierv1alpha1.Kcertifier) (string, error) {
 	}
 
 	return k8srand.SafeEncodeString(fmt.Sprint(hasher.Sum32())), nil
-}
-
-func isCertAndKeyPresentInPkg(secret v1.Secret, pkg kcertifierv1alpha1.Package, hash string) bool {
-	// check kcertifier hash
-	pkgHash, ok := secret.Annotations[KcertifierSpecHashAnnotation]
-	if !ok || pkgHash != hash {
-		return false
-	}
-	switch strings.ToLower(pkg.Type) {
-	case "none":
-		// for 'import-only' packages. no-op
-	case "pem":
-		certKey, keyKey := getPemDataKeys(pkg)
-		if _, found := secret.Data[certKey]; !found {
-			return false
-		}
-		if _, found := secret.Data[keyKey]; !found {
-			return false
-		}
-	case "pkcs12":
-		key := getP12DataKey(pkg)
-		if _, found := secret.Data[key]; !found {
-			return false
-		}
-	case "jks":
-		key := getJksDataKey(pkg)
-		if _, found := secret.Data[key]; !found {
-			return false
-		}
-	default:
-		return false
-	}
-	return true
 }
 
 func isImportsPresentInPkg(secret v1.Secret, pkg kcertifierv1alpha1.Package) bool {
