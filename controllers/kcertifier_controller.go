@@ -332,7 +332,7 @@ func (r *KcertifierReconciler) keySecretExists(ctx context.Context, kc *kcertifi
 	if err := r.Get(ctx, namespaceName, &secret); err != nil {
 		return false, client.IgnoreNotFound(err)
 	}
-	return secret.Data[KeySecretKey] != nil, nil
+	return secret.Annotations[KcertifierSpecHashAnnotation] == kc.Status.KcertifierSpecHash && secret.Data[KeySecretKey] != nil, nil
 }
 
 func (r *KcertifierReconciler) createKeySecret(ctx context.Context, kc *kcertifierv1alpha1.Kcertifier) error {
@@ -513,6 +513,14 @@ func (r *KcertifierReconciler) buildPkcs12Package(ctx context.Context, pkg kcert
 		if err != nil {
 			return fmt.Errorf("error creating pkcs12 for kcertifier, %s: %s", kc.Name, err.Error())
 		}
+		certNotAfter, err := getCertificateExpirationFromPemBytes(certBytes)
+		if err != nil {
+			return fmt.Errorf("error getting certificate expiration: %s", err.Error())
+		}
+		if secret.Annotations == nil {
+			secret.Annotations = make(map[string]string)
+		}
+		secret.Annotations[KcertifierCertExpirationAnnotation] = certNotAfter.Format(time.RFC3339Nano)
 		secret.Data[pkcs12DataKey] = pkcs12Bytes
 	}
 	return nil
@@ -560,6 +568,14 @@ func (r *KcertifierReconciler) buildJksPackage(ctx context.Context, pkg kcertifi
 		if err := keystore.Encode(&ksBytes, ks, []byte(passwordBytes)); err != nil {
 			return fmt.Errorf("error building java keystore: %s", err.Error())
 		}
+		certNotAfter, err := getCertificateExpirationFromPemBytes(certBytes)
+		if err != nil {
+			return fmt.Errorf("error getting certificate expiration: %s", err.Error())
+		}
+		if secret.Annotations == nil {
+			secret.Annotations = make(map[string]string)
+		}
+		secret.Annotations[KcertifierCertExpirationAnnotation] = certNotAfter.Format(time.RFC3339Nano)
 		secret.Data[jksDataKey] = ksBytes.Bytes()
 	}
 	return nil
@@ -898,11 +914,15 @@ func (r *KcertifierReconciler) isExpirationAnnotationValid(secret v1.Secret) boo
 		r.Log.Error(err, "invalid time in certificate expiration annotation")
 		return false
 	}
-	return time.Now().Before(notAfter.Add(- r.CertificateValidityGrace))
+	return time.Now().Before(notAfter.Add(-r.CertificateValidityGrace))
 
 }
 
 func (r *KcertifierReconciler) isCertAndKeyPresentInPkg(secret v1.Secret, pkg kcertifierv1alpha1.Package, hash string) bool {
+	// pkg type 'none' wouldn't be associated with cert/key or validity so we say true to skip these checks
+	if pkg.Type == "none" {
+		return true
+	}
 	if r.CheckCertificateValidity && !r.isExpirationAnnotationValid(secret) {
 		return false
 	}

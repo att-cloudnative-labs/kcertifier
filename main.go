@@ -70,7 +70,7 @@ func main() {
 		o.Development = true
 	}))
 
-	resync := 30 * time.Second
+	resync := 300 * time.Second
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:             scheme,
 		MetricsBindAddress: metricsAddr,
@@ -95,8 +95,8 @@ func main() {
 		Recorder:                  mgr.GetEventRecorderFor("Kcertifier"),
 		AllowGlobalImports:        allowGlobalImports,
 		AllowGlobalPasswordSecret: allowGlobalPasswordSecret,
-		CheckCertificateValidity: checkCertificateValidity,
-		CertificateValidityGrace: grace,
+		CheckCertificateValidity:  checkCertificateValidity,
+		CertificateValidityGrace:  grace,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Kcertifier")
 		os.Exit(1)
@@ -128,7 +128,7 @@ func main() {
 	}
 	// +kubebuilder:scaffold:builder
 
-	setupLog.Info("starting manager")
+	setupLog.Info("starting manager - v2 renew")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
