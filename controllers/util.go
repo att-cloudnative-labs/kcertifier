@@ -5,9 +5,10 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"hash/fnv"
+
 	kcertifierv1alpha1 "github.com/att-cloudnative-labs/kcertifier/api/v1alpha1"
 	"github.com/davecgh/go-spew/spew"
-	"hash/fnv"
 	v1 "k8s.io/api/core/v1"
 	k8srand "k8s.io/apimachinery/pkg/util/rand"
 	"software.sslmate.com/src/go-pkcs12"
@@ -106,4 +107,13 @@ func createPkcs12(certPemBytes []byte, keyPemBytes []byte, password string, alia
 		return nil, fmt.Errorf("error encoding pkcs12: %s", err.Error())
 	}
 	return p12bytes, nil
+}
+
+func find(slice []string, val string) (int, bool) {
+	for i, item := range slice {
+		if item == val {
+			return i, true
+		}
+	}
+	return -1, false
 }

@@ -5,4 +5,4 @@ kind: Kustomization
 images:
 - name: controller
   newName: docker.io/atteg/kcertifier
-  newTag: v0.11.0-alpha-2
+  newTag: v0.11.0-alpha-3

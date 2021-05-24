@@ -24,13 +24,16 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
+	"time"
+
 	kcertifierv1alpha1 "github.com/att-cloudnative-labs/kcertifier/api/v1alpha1"
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"time"
+
+	"strings"
 
 	"github.com/pavel-v-chernykh/keystore-go"
 	"k8s.io/api/certificates/v1beta1"
@@ -40,7 +43,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"software.sslmate.com/src/go-pkcs12"
-	"strings"
 )
 
 const (
@@ -136,6 +138,7 @@ type KcertifierReconciler struct {
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=certificates,resources=certificatesigningrequests,verbs=get;list;watch;create;update;patch
 // +kubebuilder:rbac:groups=certificates,resources=certificatesigningrequests/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=certificates.k8s.io,resources=signers,verbs=approve
 // +kubebuilder:rbac:groups=core,resources=events,verbs=create;update;patch
 
 // Reconcile control loop reconcile function
@@ -634,6 +637,12 @@ func (r *KcertifierReconciler) createCsr(ctx context.Context, kc *kcertifierv1al
 	}
 
 	subject := kc.Spec.Subject
+	if len(subject.CommonName) > 0 {
+		_, found := find(kc.Spec.Sans, subject.CommonName)
+		if !found {
+			kc.Spec.Sans = append([]string{subject.CommonName}, kc.Spec.Sans...)
+		}
+	}
 	template := x509.CertificateRequest{
 		Subject: pkix.Name{
 			CommonName:         subject.CommonName,
