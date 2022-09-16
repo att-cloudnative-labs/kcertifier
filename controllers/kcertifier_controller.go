@@ -483,7 +483,7 @@ func (r *KcertifierReconciler) buildPemPackage(ctx context.Context, pkg kcertifi
 		if err != nil {
 			return fmt.Errorf("error getting certificate expiration: %s", err.Error())
 		}
-		secret.Annotations[KcertifierCertExpirationAnnotation] = certNotAfter.Format(time.RFC3339Nano)
+		secret.Annotations[fmt.Sprintf("%s-%s", KcertifierCertExpirationAnnotation, certDataKey)] = certNotAfter.Format(time.RFC3339Nano)
 		secret.Data[certDataKey] = certBytes
 		secret.Data[keyDataKey] = keyBytes
 	}
@@ -523,7 +523,7 @@ func (r *KcertifierReconciler) buildPkcs12Package(ctx context.Context, pkg kcert
 		if secret.Annotations == nil {
 			secret.Annotations = make(map[string]string)
 		}
-		secret.Annotations[KcertifierCertExpirationAnnotation] = certNotAfter.Format(time.RFC3339Nano)
+		secret.Annotations[fmt.Sprintf("%s-%s", KcertifierCertExpirationAnnotation, pkcs12DataKey)] = certNotAfter.Format(time.RFC3339Nano)
 		secret.Data[pkcs12DataKey] = pkcs12Bytes
 	}
 	return nil
@@ -578,7 +578,7 @@ func (r *KcertifierReconciler) buildJksPackage(ctx context.Context, pkg kcertifi
 		if secret.Annotations == nil {
 			secret.Annotations = make(map[string]string)
 		}
-		secret.Annotations[KcertifierCertExpirationAnnotation] = certNotAfter.Format(time.RFC3339Nano)
+		secret.Annotations[fmt.Sprintf("%s-%s", KcertifierCertExpirationAnnotation, jksDataKey)] = certNotAfter.Format(time.RFC3339Nano)
 		secret.Data[jksDataKey] = ksBytes.Bytes()
 	}
 	return nil
@@ -910,15 +910,15 @@ func getCertificateExpirationFromPemBytes(pemBytes []byte) (time.Time, error) {
 	return cert.NotAfter, nil
 }
 
-func (r *KcertifierReconciler) isExpirationAnnotationValid(secret v1.Secret) bool {
+func (r *KcertifierReconciler) isExpirationAnnotationValid(secret v1.Secret, key string) bool {
 	if secret.Annotations == nil {
 		return false
 	}
-	if _, ok := secret.Annotations[KcertifierCertExpirationAnnotation]; !ok {
+	if _, ok := secret.Annotations[fmt.Sprintf("%s-%s", KcertifierCertExpirationAnnotation, key)]; !ok {
 		return false
 	}
 
-	notAfter, err := time.Parse(time.RFC3339Nano, secret.Annotations[KcertifierCertExpirationAnnotation])
+	notAfter, err := time.Parse(time.RFC3339Nano, secret.Annotations[fmt.Sprintf("%s-%s", KcertifierCertExpirationAnnotation, key)])
 	if err != nil {
 		r.Log.Error(err, "invalid time in certificate expiration annotation")
 		return false
@@ -932,9 +932,9 @@ func (r *KcertifierReconciler) isCertAndKeyPresentInPkg(secret v1.Secret, pkg kc
 	if pkg.Type == "none" {
 		return true
 	}
-	if r.CheckCertificateValidity && !r.isExpirationAnnotationValid(secret) {
-		return false
-	}
+	//if r.CheckCertificateValidity && !r.isExpirationAnnotationValid(secret) {
+	//	return false
+	//}
 	// check kcertifier hash
 	pkgHash, ok := secret.Annotations[KcertifierSpecHashAnnotation]
 	if !ok || pkgHash != hash {
@@ -943,6 +943,7 @@ func (r *KcertifierReconciler) isCertAndKeyPresentInPkg(secret v1.Secret, pkg kc
 	switch strings.ToLower(pkg.Type) {
 	case "none":
 		// for 'import-only' packages. no-op
+		return true
 	case "pem":
 		certKey, keyKey := getPemDataKeys(pkg)
 		if _, found := secret.Data[certKey]; !found {
@@ -951,14 +952,23 @@ func (r *KcertifierReconciler) isCertAndKeyPresentInPkg(secret v1.Secret, pkg kc
 		if _, found := secret.Data[keyKey]; !found {
 			return false
 		}
+		if r.CheckCertificateValidity && !r.isExpirationAnnotationValid(secret, certKey) {
+			return false
+		}
 	case "pkcs12":
 		key := getP12DataKey(pkg)
 		if _, found := secret.Data[key]; !found {
 			return false
 		}
+		if r.CheckCertificateValidity && !r.isExpirationAnnotationValid(secret, key) {
+			return false
+		}
 	case "jks":
 		key := getJksDataKey(pkg)
 		if _, found := secret.Data[key]; !found {
+			return false
+		}
+		if r.CheckCertificateValidity && !r.isExpirationAnnotationValid(secret, key) {
 			return false
 		}
 	default:
